@@ -27,6 +27,9 @@ type RPCObj int
 func (r *RPCObj) Get(key string, replyValue *string) error {
 	log.Println("Received Get with: ", key)
 
+	datastore.mu.Lock()
+	defer datastore.mu.Unlock()
+
 	index, recordExists := r.get(key)
 	if !recordExists {
 		return fmt.Errorf("key %q not found", key)
@@ -39,13 +42,13 @@ func (r *RPCObj) Get(key string, replyValue *string) error {
 func (r *RPCObj) Set(queryKVPair KVPair, replyValue *KVPair) error {
 	log.Println("Received Set with: ", queryKVPair)
 
+	datastore.mu.Lock()
+	defer datastore.mu.Unlock()
+
 	_, recordExists := r.get(queryKVPair.Key)
 	if recordExists {
 		return fmt.Errorf("key %q already exists.", queryKVPair.Key)
 	}
-
-	datastore.mu.Lock()
-	defer datastore.mu.Unlock()
 
 	datastore.data = append(datastore.data, queryKVPair)
 
@@ -57,13 +60,13 @@ func (r *RPCObj) Set(queryKVPair KVPair, replyValue *KVPair) error {
 func (r *RPCObj) Update(queryKVPair KVPair, replyValue *KVPair) error {
 	log.Println("Received Update with: ", queryKVPair)
 
+	datastore.mu.Lock()
+	defer datastore.mu.Unlock()
+
 	_, recordExists := r.get(queryKVPair.Key)
 	if !recordExists {
 		return fmt.Errorf("key %q does not exist.", queryKVPair.Key)
 	}
-
-	datastore.mu.Lock()
-	defer datastore.mu.Unlock()
 
 	for index, kvPair := range datastore.data {
 		if kvPair.Key == queryKVPair.Key {
@@ -77,15 +80,15 @@ func (r *RPCObj) Update(queryKVPair KVPair, replyValue *KVPair) error {
 }
 
 func (r *RPCObj) Delete(key string, replyValue *KVPair) error {
-	log.Println(datastore.data)
+	log.Println("Received Delete with: ", key)
+
+	datastore.mu.Lock()
+	defer datastore.mu.Unlock()
 
 	index, recordExists := r.get(key)
 	if !recordExists {
 		return fmt.Errorf("key %q does not exist.", key)
 	}
-
-	datastore.mu.Lock()
-	defer datastore.mu.Unlock()
 
 	kvPair := datastore.data[index]
 	datastore.data[index] = datastore.data[len(datastore.data)-1]
@@ -98,9 +101,6 @@ func (r *RPCObj) Delete(key string, replyValue *KVPair) error {
 }
 
 func (r *RPCObj) get(key string) (int, bool) {
-	datastore.mu.Lock()
-	defer datastore.mu.Unlock()
-
 	for index, kvPair := range datastore.data {
 		if kvPair.Key == key {
 			return index, true
